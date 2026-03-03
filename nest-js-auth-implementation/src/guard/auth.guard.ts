@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from 'src/decorator/public.decorator';
+import { jwtConstants } from 'src/auth/constants';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -27,13 +28,18 @@ export class AuthGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
         const token = this.extractTokenFromHeader(request);
         if (!token) {
-            throw new UnauthorizedException();
+            throw new UnauthorizedException('Authentication token is missing');
         }
         try {
-            const payload = await this.jwtService.verifyAsync(token);
+            const payload = await this.jwtService.verifyAsync(token, {
+                secret: jwtConstants.secret,
+            });
             request['user'] = payload;
-        } catch {
-            throw new UnauthorizedException();
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                throw new UnauthorizedException('Token has expired');
+            }
+            throw new UnauthorizedException('Invalid authentication token');
         }
         return true;
     }
